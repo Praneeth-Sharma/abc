@@ -1,0 +1,242 @@
+                                                                                                                      Nagios
+
+  update and install java
+
+       apt-get update -y
+       apt-get install default-jdk
+
+Installing the prerequisites:-
+
+       sudo apt-get install wget build-essential apache2 php apache2-mod-php7.0 php-gd libgd-dev sendmail unzip
+
+User and group configuration:-
+
+       useradd nagios
+       groupadd nagcmd
+       usermod -a -G nagcmd nagios
+       usermod -a -G nagios,nagcmd www-data
+
+Installing Nagios:-
+Step 1 - Download and extract the Nagios core:-
+
+       cd /tmp
+       wget -O nagioscore.tar.gz https://github.com/NagiosEnterprises/nagioscore/archive/nagios-4.4.1.tar.gz
+       tar xzf nagioscore.tar.gz
+       cd /tmp/nagioscore-nagios-4.4.1/
+
+Step 2 - Compile Nagios:-
+                                  (Before you build Nagios, you will have to configure it with the user and the group you have created earlier)
+
+       ./configure --with-nagios-group=nagios --with-command-group=nagcmd
+
+Now to install Nagios:-
+
+       make all
+       sudo make install
+       sudo make install-commandmode
+       sudo make install-init
+       sudo make install-config
+       /usr/bin/install -c -m 644 sample-config/httpd.conf /etc/apache2/sites-available/nagios.conf
+
+And copy evenhandler directory to the nagios directory:-
+
+       cp -R contrib/eventhandlers/ /usr/local/nagios/libexec/
+       chown -R nagios:nagios /usr/local/nagios/libexec/eventhandlers
+
+Step 3 - Install the Nagios Plugins:-
+        (Download and extract the Nagios plugins:-)
+     
+      wget https://nagios-plugins.org/download/nagios-plugins-2.1.2.tar.gz
+       tar -xzf nagios-plugins-2.1.2.tar.gz
+       cd nagios-plugins-2.1.2/
+
+       ( Install the Nagios plugin's with the commands below:-)
+       
+     ./configure --with-nagios-user=nagios --with-nagios-group=nagios --with-openssl
+       make
+       make install
+
+Step 4 - Configure Nagios:-
+         {Edit default nagios configuration with vim:}
+      
+       vim /usr/local/nagios/etc/nagios.cfg {uncomment  for the host monitor configuration(cfg_dir=/usr/local/nagios/etc/servers)}
+
+        Add a new folder named servers:-
+
+       mkdir -p /usr/local/nagios/etc/servers
+
+       The Nagios contact can be configured in the contact.cfg file. To open it use:-
+
+       vim /usr/local/nagios/etc/objects/contacts.cfg
+
+Configuring Apache:--
+       Step 1 - enable Apache modules:--
+
+       sudo a2enmod rewrite
+       sudo a2enmod cgi
+       service apache2 restart
+      
+     You can use the htpasswd command to configure a user nagiosadmin for the nagios web interface
+
+       sudo htpasswd -c /usr/local/nagios/etc/htpasswd.users nagiosadmin
+       {and type your password}
+
+     Step 2 - enable the Nagios virtualhost:--
+
+       sudo ln -s /etc/apache2/sites-available/nagios.conf /etc/apache2/sites-enabled/
+
+     Step 3 - Start Apache and Nagios:--
+
+       service apache2 restart
+       service nagios start
+
+Adding a Host to Monitor:-
+        
+      Nagios Server IP : 52.79.48.207
+      Ubuntu Host IP : 13.125.191.59
+
+   Step 1 - Connect to ubuntu host:--
+
+       ssh root@13.125.191.59
+
+   Step 2 - Install NRPE Service:--
+
+       sudo apt-get install nagios-nrpe-server nagios-plugins
+
+   Step 3 - Configure NRPE
+             
+                               After the installation is complete, edit the nrpe file /etc/nagios/nrpe.cfg:
+
+       vim /etc/nagios/nrpe.cfg
+                               
+                               and add Nagios Server IP 52.79.48.207 to the server_address.
+                               [server_address=52.79.48.207]
+
+    Step 4 - Restart NRPE:--
+
+       service nagios-nrpe-server restart
+
+    Step 5 - Add Ubuntu Host to Nagios Server:--
+                 Please connect to the Nagios server:
+
+       ssh root@52.79.48.207
+       su - nagiosadmin
+       su nagiosadmin
+       ssh-keygen -t rsa
+
+      Then create a new file for the host configuration in /usr/local/nagios/etc/servers/    
+
+       vi /usr/local/nagios/etc/servers/ubuntu_host.cfg
+      
+      Add the following lines:-------------------------------------------------------------------------------------------------------[
+
+ # Ubuntu Host configuration file
+
+define host {
+        use                          linux-server
+        host_name                    ubuntu_host
+        alias                        Ubuntu Host
+        address                      13.125.191.59
+        register                     1
+}
+
+define service {
+      host_name                       ubuntu_host
+      service_description             PING
+      check_command                   check_ping!100.0,20%!500.0,60%
+      max_check_attempts              2
+      check_interval                  2
+      retry_interval                  2
+      check_period                    24x7
+      check_freshness                 1
+      contact_groups                  admins
+      notification_interval           2
+      notification_period             24x7
+      notifications_enabled           1
+      register                        1
+}
+
+define service {
+      host_name                       ubuntu_host
+      service_description             Check Users
+      check_command           check_local_users!20!50
+      max_check_attempts              2
+      check_interval                  2
+      retry_interval                  2
+      check_period                    24x7
+      check_freshness                 1
+      contact_groups                  admins
+      notification_interval           2
+      notification_period             24x7
+      notifications_enabled           1
+      register                        1
+}
+
+define service {
+      host_name                       ubuntu_host
+      service_description             Local Disk
+      check_command                   check_local_disk!20%!10%!/
+      max_check_attempts              2
+      check_interval                  2
+      retry_interval                  2
+      check_period                    24x7
+      check_freshness                 1
+      contact_groups                  admins
+      notification_interval           2
+      notification_period             24x7
+      notifications_enabled           1
+      register                        1
+}
+
+define service {
+      host_name                       ubuntu_host
+      service_description             Check SSH
+      check_command                   check_ssh
+      max_check_attempts              2
+      check_interval                  2
+      retry_interval                  2
+      check_period                    24x7
+      check_freshness                 1
+      contact_groups                  admins
+      notification_interval           2
+      notification_period             24x7
+      notifications_enabled           1
+      register                        1
+}
+
+define service {
+      host_name                       ubuntu_host
+      service_description             Total Process
+      check_command                   check_local_procs!250!400!RSZDT
+      max_check_attempts              2
+      check_interval                  2
+      retry_interval                  2
+      check_period                    24x7
+      check_freshness                 1
+      contact_groups                  admins
+      notification_interval           2
+      notification_period             24x7
+      notifications_enabled           1
+      register                        1
+}                                    
+ save it  -----------------------]
+
+You can find many check_command in /usr/local/nagios/etc/objects/commands.cfg file. See there if you want to add more services like DHCP, POP etc
+
+....................................................................................................................................
+  And now check the configuration:---
+
+       sudo /usr/local/nagios/bin/nagios -v /usr/local/nagios/etc/nagios.cfg
+
+  Step 6 - Restart all services:---
+               On the Ubuntu Host start NRPE Service:-
+       
+       sudo service nagios-nrpe-server restart
+
+      ... and on the Nagios server, start Apache and Nagios:--
+
+       sudo service apache2 restart
+       service nagios restart
+
+
+

@@ -1,0 +1,18 @@
+installiation
+sudo apt-get install jenkins
+
+inital password location
+/var/lib/jenkins/secrets/initialAdminPassword
+
+jenkins port change location
+vi /etc/default/jenkins 
+
+jenkins home director
+/var/lib/jenkins
+
+maven install
+apt-get install  maven
+
+maven home directory
+/usr/share/maven
+
